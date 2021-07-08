@@ -19,5 +19,5 @@ docker run -v <path>/fluentd/config/server_fluentd-aggregator.conf:/fluentd/etc/
 ```
 run test-aggregator
 ```
-docker run -v <path>/fluentd/deprecated/test-aggregator.conf:/fluentd/etc/fluent.conf -v <log-folder>:/var/log/app --net=host -d fluentd:aggregator
+docker run -v <path>/fluentd/deprecated/test-aggregator.conf:/fluentd/etc/fluent.conf -v <log-folder>:/var/log/test-service --net=host -d fluentd:aggregator
 ```

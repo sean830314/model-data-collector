@@ -7,10 +7,10 @@ from pythonjsonlogger import jsonlogger
 class CustomJsonFormatter(jsonlogger.JsonFormatter):
     def add_fields(self, log_record, record, message_dict):
         super(CustomJsonFormatter, self).add_fields(log_record, record, message_dict)
-        if not log_record.get('timestamp'):
+        if not log_record.get('log_time'):
             # this doesn't use record.created, so it is slightly off
             now = datetime.datetime.utcnow().strftime('%Y-%m-%dT%H:%M:%S.%fZ')
-            log_record['timestamp'] = now
+            log_record['log_time'] = now
         if log_record.get('level'):
             log_record['level'] = log_record['level'].upper()
         else:
@@ -18,7 +18,7 @@ class CustomJsonFormatter(jsonlogger.JsonFormatter):
             
 logger = logging.getLogger()
 logger.setLevel(logging.DEBUG)
-formatter = CustomJsonFormatter('%(timestamp)s %(level)s %(name)s %(message)s')
+formatter = CustomJsonFormatter('%(log_time)s %(level)s %(name)s %(message)s')
 
 stream_logHandler = logging.StreamHandler()
 stream_logHandler.setLevel(logging.DEBUG)

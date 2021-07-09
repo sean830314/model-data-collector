@@ -21,3 +21,6 @@ run test-aggregator
 ```
 docker run -v <path>/fluentd/deprecated/test-aggregator.conf:/fluentd/etc/fluent.conf -v <log-folder>:/var/log/test-service --net=host -d fluentd:aggregator
 ```
+
+## Framework
+![alt text](https://github.com/sean830314/model-data-collector/blob/master/fluentd/docs/model-fluentd-collector.png)

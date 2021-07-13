@@ -1,0 +1,190 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: MyApp-deployment
+  namespace: default
+  labels:
+    app: MyApp
+spec:
+  selector:
+    matchLabels:
+      app: MyApp
+  replicas: 3
+  template:
+    metadata:
+      labels:
+        app: MyApp
+    spec:
+      containers:
+      - name: MyApp-service
+        image: MyApp-service
+        imagePullPolicy: Always
+        ports:
+        - containerPort: 8888
+          name: grpc
+        envFrom:
+        - configMapRef:
+            name: MyApp-service-config
+        volumeMounts:
+        - name: shared-data
+          mountPath: /var/log/idoxai/
+        livenessProbe:
+          tcpSocket:
+            port: grpc
+          periodSeconds: 30
+        startupProbe:
+          tcpSocket:
+            port: grpc
+          failureThreshold: 30
+          periodSeconds: 10
+      - name: fluentd-agent
+        image: fluent/fluentd:v1.13.0-1.0
+        ports:
+        - containerPort: 24224
+          name: tcp
+        securityContext:
+          runAsUser: 0
+        command: ["/bin/sh"]
+        args:
+          - -c
+          - |
+            apk add --no-cache bash make gcc libc-dev ruby-dev
+            apk del make gcc libc-dev ruby-dev
+            mkdir -p /var/log/test
+            fluentd
+        volumeMounts:
+        - name: fluentd-config-volume
+          mountPath: /fluentd/etc/fluent.conf
+          subPath: server_fluentd-agent.conf
+          readOnly: true
+        - name: shared-data
+          mountPath: /var/log/idoxai/
+        livenessProbe:
+          tcpSocket:
+            port: tcp
+          periodSeconds: 30
+        startupProbe:
+          tcpSocket:
+            port: tcp
+          failureThreshold: 30
+          periodSeconds: 10
+      volumes:
+      - name: fluentd-config-volume
+        configMap:
+          name: fluentd-agent-config
+      - name: shared-data
+        emptyDir: {}
+      imagePullSecrets:
+      - name: regcred
+
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: MyApp-service
+  namespace: default
+spec:
+  ports:
+  - name: grpc
+    port: 50051
+    protocol: TCP
+    targetPort: 8888
+  selector:
+    app: MyApp
+
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: fluentd-agent-config
+  namespace: default
+data:
+  server_fluentd-agent.conf: |
+    <source>
+      @type forward
+      port 24224
+      bind 0.0.0.0
+    </source>
+
+    # tail categorization service log
+    <source>
+      @type tail
+      <parse>
+        @type json
+      </parse>
+      path /var/log/idoxai/categorization-service/*.log
+      pos_file /var/log/idoxai/categorization-service/data.log.pos
+      tag model.categorization
+    </source>
+
+    # tail contract service log
+    <source>
+      @type tail
+      <parse>
+        @type json
+      </parse>
+      path /var/log/idoxai/contract-service/*.log
+      pos_file /var/log/idoxai/contract-service/data.log.pos
+      tag model.contract
+    </source>
+
+    # tail ner service log
+    <source>
+      @type tail
+      <parse>
+        @type json
+      </parse>
+      path /var/log/idoxai/ner-service/*.log
+      pos_file /var/log/idoxai/ner-service/data.log.pos
+      tag model.ner
+    </source>
+
+    # tail segmentation service log
+    <source>
+      @type tail
+      <parse>
+        @type json
+      </parse>
+      path /var/log/idoxai/segmentation-service/*.log
+      pos_file /var/log/idoxai/segmentation-service/data.log.pos
+      tag model.segmentation
+    </source>
+
+    # filter model input & oupt log
+    <filter model.*>
+      @type grep
+      <regexp>
+        key message
+        pattern /model_predicts/
+      </regexp>
+    </filter>
+
+    # model records transformer
+    <filter model.*>
+      @type record_transformer
+      enable_ruby
+      <record>
+        hostname "#{Socket.gethostname}"
+        tag ${tag}
+        message ${record["message"].gsub("model_predicts:", "")}
+      </record>
+    </filter>
+
+    # send to fluentd aggregator
+    <match *.*>
+      @type copy
+      <store>
+        @type stdout
+      </store>
+      <store>
+        @type forward
+        send_timeout 30s
+        recover_wait 10s
+        hard_timeout 60s
+        <server>
+          name fluentd-aggregator
+          host fluentd-aggregator
+          port 24224
+        </server>
+      </store>
+    </match>

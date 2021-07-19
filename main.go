@@ -15,6 +15,7 @@ import (
 	"github.com/ThreeDotsLabs/watermill/message/router/middleware"
 	"github.com/ThreeDotsLabs/watermill/message/router/plugin"
 	"github.com/sean830314/model-data-collector/internal"
+	"github.com/sean830314/model-data-collector/internal/http"
 )
 
 var (
@@ -24,8 +25,8 @@ var (
 	natsURL             = os.Getenv("NATS_URL")
 	// You probably want to ship your own implementation of `watermill.LoggerAdapter`.
 	logger     = watermill.NewStdLogger(false, false) // debug=false, trace=false
-	dlaSubject = "dla_subject"
-	piiSubject = "pii_subject"
+	dlaSubject = "model.dla"
+	piiSubject = "model.pii"
 )
 
 func main() {
@@ -100,26 +101,11 @@ func main() {
 		subscriber,
 		internal.BioTransferHandler{}.HandlerWithoutPublish,
 	)
-
-	// Producing some incoming messages in background
-	go publishMessages(piiSubject, publisher, 10)
-	go publishMessages(dlaSubject, publisher, 7)
+	// Producing some messages in background http server
+	go http.PublishMessagesServer(publisher)
 	// Run the router
 	ctx := context.Background()
 	if err := router.Run(ctx); err != nil {
 		log.Fatal(err)
-	}
-}
-
-func publishMessages(topic string, publisher message.Publisher, delay time.Duration) {
-	for {
-		msg := message.NewMessage(watermill.NewUUID(), []byte(fmt.Sprintf("topic: %s, time: %s\n", topic, time.Now().String())))
-		middleware.SetCorrelationID(watermill.NewUUID(), msg)
-
-		fmt.Printf("\n\n\nSending message %s, correlation id: %s\n", msg.UUID, middleware.MessageCorrelationID(msg))
-		if err := publisher.Publish(topic, msg); err != nil {
-			log.Fatal(err)
-		}
-		time.Sleep(delay * time.Second)
 	}
 }

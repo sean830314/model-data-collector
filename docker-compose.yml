@@ -1,0 +1,26 @@
+version: "3.9"
+services:
+  web:
+    image: "ekko771/test-model:latest"
+    ports:
+    - "8080:8080"
+    environment:
+    - WATERMILL_PUBSUB_TYPE="nats"
+    - NATS_CLUSTER_ID="test-cluster"
+    - NATS_URL="nats://nats-streaming:4222"
+  nats-streaming:
+    image: "nats-streaming:latest"
+    ports:
+    - "4222:4222"
+    - "8222:8222"
+  fluentd-agent-sidecar:
+    image: "fluentd:agent"
+    volumes:
+    - D:\go_workspace\src\github.com\sean830314\model-data-collector\deploy\server_fluentd-agent.conf:/fluentd/etc/fluent.conf
+    - D:\go_workspace\src\github.com\sean830314\model-data-collector\data:/var/log/idoxai
+  fluentd-aggregator:
+    image: "fluentd:aggregator"
+    ports:
+    - "24224:24224"
+    volumes:
+    - D:\go_workspace\src\github.com\sean830314\model-data-collector\deploy\server_fluentd-aggregator.conf:/fluentd/etc/fluent.conf

@@ -1,4 +1,4 @@
-FROM fluent/fluentd:v1.4-2
+FROM fluent/fluentd:v1.13.0-1.0
 USER root
 # add mongo plugin
 RUN apk add --no-cache bash make gcc libc-dev ruby-dev \

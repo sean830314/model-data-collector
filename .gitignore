@@ -1,2 +1,5 @@
 .vscode
 data
+vendor
+.env
+__debug_bin
